@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Simple Web Payment</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+
+  /* Reset and base */
+  * {
+    box-sizing: border-box;
+  }
+  body, html {
+    margin: 0; padding: 0; height: 100%;
+    font-family: 'Poppins', sans-serif;
+    background: #f5f7fa;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #app {
+    position: relative;
+    width: 350px;
+    max-width: 100vw;
+    max-height: 600px;
+    background: url('https://i.ibb.co/hRjyrwGd/3f0a8c3f68ed10dad1987dfbeeab4b6b.jpg') no-repeat center/cover;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 1;
+  }
+
+  /* Overlay white panel inside with transparency for content */
+  #contentPanel {
+    background: rgba(255 255 255 / 0.8);
+    border-radius: 16px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* Colorful blurred shapes around container edges */
+  #app::before, #app::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(45px);
+    opacity: 0.6;
+    z-index: 0;
+  }
+  #app::before {
+    width: 120px;
+    height: 120px;
+    top: -40px;
+    left: -40px;
+    background: #ff4081; /* pink */
+    mix-blend-mode: screen;
+  }
+  #app::after {
+    width: 200px;
+    height: 200px;
+    bottom: -80px;
+    right: -60px;
+    background: #3366ff; /* blue */
+    mix-blend-mode: screen;
+  }
+  /* Additional decorative overlapping small circles */
+  #app .decor-circle {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(30px);
+    opacity: 0.45;
+    z-index: 0;
+  }
+  #app .decor-circle.one {
+    width: 100px; height: 100px;
+    top: 80px; right: -60px;
+    background: #ff6f00; /* orange */
+    mix-blend-mode: screen;
+  }
+  #app .decor-circle.two {
+    width: 70px; height: 70px;
+    bottom: 140px; left: -50px;
+    background: #00c853; /* green */
+    mix-blend-mode: screen;
+  }
+
+  /* Animations */
+  .fade-in {
+    animation: fadeIn 0.5s ease forwards;
+  }
+  .fade-out {
+    animation: fadeOut 0.5s ease forwards;
+  }
+  .zoom-fade-in {
+    animation: zoomFadeIn 0.4s ease forwards;
+  }
+  .zoom-fade-out {
+    animation: zoomFadeOut 0.4s ease forwards;
+  }
+  .toast-show {
+    animation: slideUpFade 2.6s forwards ease;
+  }
+
+  @keyframes fadeIn {
+    0% {opacity: 0;}
+    100% {opacity: 1;}
+  }
+  @keyframes fadeOut {
+    0% {opacity: 1;}
+    100% {opacity: 0; display: none;}
+  }
+  @keyframes zoomFadeIn {
+    from {opacity: 0; transform: scale(0.8);}
+    to {opacity: 1; transform: scale(1);}
+  }
+  @keyframes zoomFadeOut {
+    from {opacity: 1; transform: scale(1);}
+    to {opacity: 0; transform: scale(0.8);}
+  }
+  @keyframes slideUpFade {
+    0% {opacity: 0; transform: translateY(40px);}
+    10% {opacity: 1; transform: translateY(0);}
+    90% {opacity: 1; transform: translateY(0);}
+    100% {opacity: 0; transform: translateY(-40px);}
+  }
+
+  /* Greeting screen */
+  #greetingScreen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 32px 24px;
+    text-align: center;
+    position: relative;
+  }
+  #greetingScreen h1 {
+    font-weight: 700;
+    font-size: 2.4rem;
+    margin-bottom: 16px;
+    color: #1a237e;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+  #greetingScreen p {
+    font-weight: 400;
+    font-size: 1.15rem;
+    color: #37474f;
+    max-width: 300px;
+    margin-bottom: 36px;
+    line-height: 1.4;
+  }
+  #greetingScreen button {
+    background: #3366FF;
+    border: none;
+    color: white;
+    font-weight: 600;
+    font-size: 1.1rem;
+    padding: 16px 48px;
+    border-radius: 40px;
+    box-shadow: 0 6px 14px rgba(51,102,255,0.4);
+    cursor: pointer;
+    transition: background 0.3s ease, box-shadow 0.3s ease;
+  }
+  #greetingScreen button:hover, #greetingScreen button:focus {
+    background: #254eda;
+    box-shadow: 0 8px 20px rgba(37,78,218,0.6);
+    outline: none;
+  }
+
+  /* Payment screen */
+  #paymentScreen {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+    padding: 24px 20px 24px 20px;
+    overflow: hidden;
+    position: relative;
+    z-index: 2;
+  }
+
+  .qris-box {
+    background: #eef3ff;
+    border-radius: 16px;
+    padding: 20px;
+    cursor: pointer;
+    box-shadow: 0 6px 10px rgba(51,102,255,0.15);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: box-shadow 0.3s ease;
+  }
+  .qris-box:hover {
+    box-shadow: 0 8px 20px rgba(51,102,255,0.3);
+  }
+  .qris-box img {
+    width: 160px;
+    height: 160px;
+    user-select: none;
+    border-radius: 8px;
+  }
+
+  /* Overlay for QRIS */
+  #overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    padding: 20px;
+    overflow: auto;
+  }
+  #overlay .overlay-box {
+    position: relative;
+    background: white;
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform-origin: center center;
+  }
+  #overlay .overlay-box img {
+    width: 280px;
+    height: 280px;
+    user-select: none;
+    border-radius: 12px;
+  }
+  #overlay .close-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: #ff5f57;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: 22px;
+    line-height: 36px;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    box-shadow: 0 3px 8px rgba(255,95,87,0.6);
+    transition: background 0.3s ease;
+  }
+  #overlay .close-btn:hover {
+    background: #e04b44;
+  }
+
+  /* Payment toggle line */
+  .toggle-line {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    margin-top: 24px;
+    user-select: none;
+    font-weight: 600;
+    color: #3366FF;
+    font-size: 1.1rem;
+    position: relative;
+  }
+  .toggle-line .arrow {
+    border: solid #3366FF;
+    border-width: 0 3px 3px 0;
+    display: inline-block;
+    padding: 6px;
+    margin-right: 10px;
+    transform: rotate(135deg);
+    transition: transform 0.3s ease;
+  }
+  .toggle-line.expanded .arrow {
+    transform: rotate(315deg);
+  }
+  .toggle-line::before {
+    content: "";
+    position: absolute;
+    bottom: -9px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: #3366FF;
+    border-radius: 1px;
+    opacity: 0.4;
+  }
+
+  /* Payment methods list */
+  .toggle-content {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease, opacity 0.45s ease 0.2s;
+    margin-top: 8px;
+    padding-left: 32px;
+    color: #222;
+    font-size: 1rem;
+    border-left: 3px solid #3366FF;
+    user-select: none;
+  }
+  .toggle-content.expanded {
+    max-height: 400px; /* enough for content */
+    opacity: 1;
+  }
+  .toggle-content div, .toggle-content li {
+    padding: 8px 0;
+  }
+  .toggle-content .method-name {
+    font-weight: 600;
+    color: #3366FF;
+  }
+
+  /* Bank section */
+  #bankSection {
+    margin-top: 10px;
+    padding-left: 0;
+    font-size: 1rem;
+    color: #222;
+  }
+  #bankSection h3 {
+    margin-bottom: 0;
+    font-weight: 600;
+    color: #3366FF;
+    user-select: none;
+  }
+  #bankSection ul {
+    margin: 0;
+    padding: 0 0 0 16px;
+    list-style: none;
+  }
+  #bankSection li {
+    margin-bottom: 10px;
+    line-height: 1.3;
+    user-select: none;
+  }
+  #bankSection li span {
+    font-weight: 600;
+  }
+
+  /* Interactive payment & bank numbers styling */
+  .copyable {
+    cursor: pointer;
+    border-bottom: 1px dashed #3366FF;
+    transition: color 0.3s ease;
+  }
+  .copyable:hover {
+    color: #254eda;
+  }
+  .copyable:focus {
+    outline: 2px solid #3366FF;
+    outline-offset: 2px;
+  }
+
+  /* Toast message */
+  #toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #3366FF;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 30px;
+    font-weight: 600;
+    font-size: 1rem;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 10000;
+    user-select: none;
+  }
+  #toast.show {
+    opacity: 1;
+  }
+
+  /* Responsive for smaller phones */
+  @media (max-width: 400px) {
+    #app {
+      width: 90vw;
+      max-height: 90vh;
+    }
+    #overlay .overlay-box img {
+      width: 90vw;
+      height: 90vw;
+    }
+    .qris-box img {
+      width: 130px;
+      height: 130px;
+    }
+  }
+</style>
+</head>
+<body>
+  <div id="app" role="main" aria-label="Payment application" tabindex="0" aria-live="polite">
+    <div class="decor-circle one" aria-hidden="true"></div>
+    <div class="decor-circle two" aria-hidden="true"></div>
+
+    <div id="contentPanel">
+      <!-- Greeting Screen -->
+      <section id="greetingScreen" aria-live="polite">
+        <h1>Welcome to WarzPay!</h1>
+        <p>Streamline your payment experience with a simple QR code scan or choose your preferred payment method below. Safe, fast, and reliable.</p>
+        <button id="btnGoPayment" aria-label="Go to Payment page">Go to Payment</button>
+      </section>
+
+      <!-- Payment Screen -->
+      <section id="paymentScreen" aria-live="polite" aria-hidden="true">
+        <div class="qris-box" tabindex="0" aria-label="QRIS Payment Code - Click to enlarge" role="button">
+          <img src="https://i.ibb.co/CKGyTj03/f6fbc4deadbcc5287d59fff163191cee.jpg" alt="QRIS Code Example" id="qrisImage" />
+        </div>
+
+        <div id="paymentToggle" class="toggle-line" role="button" tabindex="0" aria-expanded="false" aria-controls="paymentMethods" aria-label="Toggle payment methods">
+          <span class="arrow"></span>
+          Ewalet 
+        </div>
+        <div id="paymentMethods" class="toggle-content" aria-hidden="true">
+          <div><span class="method-name">Dana</span><br /><span class="copyable" tabindex="0" role="button" aria-label="Copy Dana number">082130858301</span></div>
+          <div><span class="method-name">Gopay</span><br /><span class="copyable" tabindex="0" role="button" aria-label="Copy Gopay number">082218603188</span></div>
+          <div><span class="method-name">Ovo</span><br /><span class="copyable" tabindex="0" role="button" aria-label="Copy Ovo number">BELUM TERSEDIA</span></div>
+        </div>
+
+        <div id="bankToggle" class="toggle-line" role="button" tabindex="0" aria-expanded="false" aria-controls="bankSection" aria-label="Toggle bank transfer methods" style="margin-top:24px;">
+          <span class="arrow"></span>
+          Bank Transfer
+        </div>
+        <section id="bankSection" class="toggle-content" aria-hidden="true" style="margin-top: 0;">
+          <ul>
+            <li><span>BRI:</span> <span class="copyable" tabindex="0" role="button" aria-label="Copy BRI bank number">BELUM TERSEDIA</span></li>
+            <li><span>BCA:</span> <span class="copyable" tabindex="0" role="button" aria-label="Copy BCA bank number">BELUM TERSEDIA</span></li>
+            <li><span>Mandiri:</span> <span class="copyable" tabindex="0" role="button" aria-label="Copy Mandiri bank number">BELUM TERSEDIA</span></li>
+          </ul>
+        </section>
+      </section>
+    </div>
+  </div>
+
+  <!-- Overlay for QRIS -->
+  <div id="overlay" role="dialog" aria-modal="true" aria-label="QRIS payment code enlarged view">
+    <div class="overlay-box">
+      <div class="close-btn" role="button" tabindex="0" aria-label="Close QRIS overlay">&times;</div>
+      <img src="https://i.ibb.co/CKGyTj03/f6fbc4deadbcc5287d59fff163191cee.jpg" alt="QRIS Code Enlarged" />
+    </div>
+  </div>
+
+  <!-- Toast Message -->
+  <div id="toast" role="alert" aria-live="assertive"></div>
+
+  <!-- Background music -->
+  <audio id="bgMusic" src="mm.mp3" loop></audio>
+
+<script>
+  const btnGoPayment = document.getElementById('btnGoPayment');
+  const greetingScreen = document.getElementById('greetingScreen');
+  const paymentScreen = document.getElementById('paymentScreen');
+  const qrisBox = document.querySelector('.qris-box');
+  const overlay = document.getElementById('overlay');
+  const overlayCloseBtn = overlay.querySelector('.close-btn');
+  const paymentToggle = document.getElementById('paymentToggle');
+  const paymentMethods = document.getElementById('paymentMethods');
+  const bankToggle = document.getElementById('bankToggle');
+  const bankSection = document.getElementById('bankSection');
+  const toast = document.getElementById('toast');
+  const bgMusic = document.getElementById('bgMusic');
+
+  // Animate showing payment screen with fade
+  btnGoPayment.addEventListener('click', () => {
+    greetingScreen.classList.add('fade-out');
+    greetingScreen.addEventListener('animationend', () => {
+      greetingScreen.style.display = 'none';
+      paymentScreen.style.display = 'flex';
+      paymentScreen.classList.add('fade-in');
+      paymentScreen.setAttribute('aria-hidden', 'false');
+    }, { once: true });
+
+    // Attempt to play background music on user interaction
+    bgMusic.play().catch(() => {
+      // No problem if autoplay blocked, music will play on next user interaction
+    });
+  });
+
+  // Accessibility: allow Enter/Space on greeting button
+  btnGoPayment.addEventListener('keydown', e => {
+    if(e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      btnGoPayment.click();
+    }
+  });
+
+  // Show overlay with animation when QRIS box clicked
+  qrisBox.addEventListener('click', () => {
+    overlay.style.display = 'flex';
+    overlay.classList.remove('zoom-fade-out');
+    overlay.classList.add('zoom-fade-in');
+    // prevent body scroll
+    document.body.style.overflow = 'hidden';
+  });
+  qrisBox.addEventListener('keydown', e => {
+    if(e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      qrisBox.click();
+    }
+  });
+
+  // Close overlay with animation on X button click
+  function closeOverlay() {
+    overlay.classList.remove('zoom-fade-in');
+    overlay.classList.add('zoom-fade-out');
+    overlay.addEventListener('animationend', () => {
+      overlay.style.display = 'none';
+      document.body.style.overflow = '';
+    }, { once: true });
+  }
+  overlayCloseBtn.addEventListener('click', () => {
+    closeOverlay();
+  });
+  overlayCloseBtn.addEventListener('keydown', e => {
+    if(e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      overlayCloseBtn.click();
+    }
+  });
+
+  // Close overlay if clicking outside overlay-box
+  overlay.addEventListener('click', e => {
+    if(e.target === overlay) {
+      closeOverlay();
+    }
+  });
+
+  // Toggle payment methods expand/collapse with animation
+  function toggleContent(toggleBtn, content) {
+    const expanded = content.classList.toggle('expanded');
+    toggleBtn.classList.toggle('expanded', expanded);
+
+    toggleBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    content.setAttribute('aria-hidden', expanded ? 'false' : 'true');
+  }
+
+  paymentToggle.addEventListener('click', () => toggleContent(paymentToggle, paymentMethods));
+  paymentToggle.addEventListener('keydown', e => {
+    if(e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      paymentToggle.click();
+    }
+  });
+  bankToggle.addEventListener('click', () => toggleContent(bankToggle, bankSection));
+  bankToggle.addEventListener('keydown', e => {
+    if(e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      bankToggle.click();
+    }
+  });
+
+  // Clipboard copy functionality for payment numbers and bank numbers
+  function showToast(message) {
+    toast.textContent = message;
+    toast.classList.add('toast-show');
+    setTimeout(() => {
+      toast.classList.remove('toast-show');
+    }, 2600);
+  }
+
+  function copyTextToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    } else {
+      // fallback older approach
+      const temp = document.createElement('textarea');
+      temp.style.position = 'fixed';
+      temp.style.top = 0;
+      temp.style.left = 0;
+      temp.style.width = '2em';
+      temp.style.height = '2em';
+      temp.style.padding = 0;
+      temp.style.border = 'none';
+      temp.style.outline = 'none';
+      temp.style.boxShadow = 'none';
+      temp.style.background = 'transparent';
+      temp.value = text;
+      document.body.appendChild(temp);
+      temp.select();
+      let success = false;
+      try {
+        success = document.execCommand('copy');
+      } catch (e) {
+        success = false;
+      }
+      document.body.removeChild(temp);
+      return success ? Promise.resolve() : Promise.reject();
+    }
+  }
+
+  // Add event listeners to all .copyable spans for click and keyboard interaction
+  function makeCopyable(el) {
+    el.addEventListener('click', () => {
+      const text = el.textContent.trim();
+      copyTextToClipboard(text).then(() => {
+        showToast(`Success: "${text}" copied`);
+      }).catch(() => {
+        showToast("Failed to copy");
+      });
+    });
+    el.addEventListener('keydown', e => {
+      if(e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        el.click();
+      }
+    });
+  }
+  document.querySelectorAll('.copyable').forEach(makeCopyable);
+
+  // On first user interaction, try to play background music (Chrome requires user interaction)
+  function tryPlayMusic() {
+    bgMusic.play().catch(() => {});
+    window.removeEventListener('click', tryPlayMusic);
+    window.removeEventListener('keydown', tryPlayMusic);
+  }
+  window.addEventListener('click', tryPlayMusic);
+  window.addEventListener('keydown', tryPlayMusic);
+
+</script>
+</body>
+</html>
+
